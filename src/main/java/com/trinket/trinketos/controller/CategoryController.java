@@ -83,6 +83,9 @@ public class CategoryController {
     }
 
     if (request.getName() != null) {
+      if (request.getName().isBlank()) {
+        throw new IllegalArgumentException("Name cannot be empty");
+      }
       com.trinket.trinketos.util.StringUtils.validateString(request.getName(), "Name",
           com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
       category.setName(request.getName());
@@ -110,6 +113,9 @@ public class CategoryController {
   @Operation(summary = "Create a new category")
   public ResponseEntity<Category> createCategory(@RequestBody Category category, Authentication authentication) {
     User user = getUser(authentication);
+    if (category.getName() == null || category.getName().isBlank()) {
+      throw new IllegalArgumentException("Name is required");
+    }
     com.trinket.trinketos.util.StringUtils.validateString(category.getName(), "Name",
         com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
     com.trinket.trinketos.util.StringUtils.validateString(category.getDescription(), "Description",

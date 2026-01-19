@@ -50,6 +50,13 @@ public class TeamController {
     String name = normalizeText(request.name());
     String displayName = normalizeText(request.displayName());
 
+    if (name == null || name.isBlank()) {
+      throw new IllegalArgumentException("Name is required");
+    }
+    if (displayName == null || displayName.isBlank()) {
+      throw new IllegalArgumentException("Display Name is required");
+    }
+
     com.trinket.trinketos.util.StringUtils.validateString(name, "Name",
         com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
     if (displayName != null) {
@@ -137,18 +144,23 @@ public class TeamController {
     String name = normalizeText(request.name());
     String displayName = normalizeText(request.displayName());
 
-    com.trinket.trinketos.util.StringUtils.validateString(name, "Name",
-        com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
-    if (displayName != null) {
+    if (name != null && !name.isBlank()) {
+      com.trinket.trinketos.util.StringUtils.validateString(name, "Name",
+          com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
+      team.setName(name);
+    }
+
+    if (displayName != null && !displayName.isBlank()) {
       com.trinket.trinketos.util.StringUtils.validateString(displayName, "Display Name",
           com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
+      team.setDisplayName(displayName);
     }
-    com.trinket.trinketos.util.StringUtils.validateString(request.description(), "Description",
-        com.trinket.trinketos.util.StringUtils.ValidationMode.DESCRIPTION_NO_EMOJI, true);
 
-    team.setName(name);
-    team.setDisplayName(displayName);
-    team.setDescription(request.description());
+    if (request.description() != null) {
+      com.trinket.trinketos.util.StringUtils.validateString(request.description(), "Description",
+          com.trinket.trinketos.util.StringUtils.ValidationMode.DESCRIPTION_NO_EMOJI, true);
+      team.setDescription(request.description());
+    }
     // NOTE: Not updating slug on edit to preserve URLs, unless explicitly
     // requested.
 
@@ -191,33 +203,6 @@ public class TeamController {
       return null;
     }
     return text.trim().replaceAll("\\s+", " ");
-  }
-
-  private void validateName(String value, String fieldName) {
-    // Allow unicode letters (including marks/accents), numbers, spaces (including
-    // NBSP), and common
-    // punctuation (-, _, ., (, )).
-    String regex = "^[\\p{L}\\p{M}0-9\\p{Z}\\.\\-\\_\\(\\)]+$";
-    if (value == null || !value.matches(regex)) {
-      throw new IllegalArgumentException(
-          String.format(
-              "The field '%s' contains invalid characters. Value received: '%s'. Only letters, numbers, spaces, and common punctuation (-, _, ., (, )) are allowed.",
-              fieldName, value));
-    }
-  }
-
-  private void validateDescription(String value, String fieldName) {
-    if (value == null || value.isBlank())
-      return;
-    // Allow Letters, Marks, Numbers, Punctuation, Separators, Math Symbols,
-    // Currency Symbols.
-    // Excludes \p{So} (Symbol, other) which contains most Emojis.
-    // Also explicitly allows newlines (\n, \r).
-    String regex = "^[\\p{L}\\p{M}\\p{N}\\p{P}\\p{Z}\\p{Sm}\\p{Sc}\\n\\r]+$";
-    if (!value.matches(regex)) {
-      throw new IllegalArgumentException(
-          String.format("The field '%s' contains invalid characters (Emojis are not allowed).", fieldName));
-    }
   }
 
   private TeamResponse mapToResponse(Team t) {
