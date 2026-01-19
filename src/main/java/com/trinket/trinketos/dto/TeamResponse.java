@@ -2,5 +2,8 @@ package com.trinket.trinketos.dto;
 
 import java.util.UUID;
 
-public record TeamResponse(UUID id, String name, String displayName, String description, UUID organizationId) {
+import java.time.LocalDateTime;
+
+public record TeamResponse(UUID id, String name, String displayName, String description, UUID organizationId,
+    LocalDateTime createdAt, LocalDateTime updatedAt) {
 }

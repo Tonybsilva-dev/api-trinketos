@@ -195,6 +195,7 @@ public class TeamController {
   }
 
   private TeamResponse mapToResponse(Team t) {
-    return new TeamResponse(t.getId(), t.getName(), t.getDisplayName(), t.getDescription(), t.getOrganizationId());
+    return new TeamResponse(t.getId(), t.getName(), t.getDisplayName(), t.getDescription(), t.getOrganizationId(),
+        t.getCreatedAt(), t.getUpdatedAt());
   }
 }

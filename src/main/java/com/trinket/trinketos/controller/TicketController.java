@@ -163,13 +163,10 @@ public class TicketController {
       ticket.setDescription(request.description());
     if (request.priority() != null)
       ticket.setPriority(request.priority());
+    if (request.status() != null)
+      ticket.setStatus(request.status());
 
-    // If ticket request has other fields not in record but in entity (like status),
-    // we need DTO update or specialized endpoint.
-    // TicketRequest currently: title, description, priority, customerId.
-    // Status is not in Request. Usually specific transition endpoints are better,
-    // but user asked for Standard Update.
-    // I will stick to fields present in TicketRequest for now.
+    // TicketRequest now includes status.
 
     Ticket updated = ticketRepository.save(ticket);
     return ResponseEntity.ok(mapToResponse(updated));

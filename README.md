@@ -49,6 +49,12 @@ A documentação interativa (Swagger UI) está disponível em:
 | **GET** | `/api/v1/teams/{id}` | Autenticado | Detalhes. |
 | **PUT** | `/api/v1/teams/{id}` | **Admin** | Atualiza. |
 | **DELETE**| `/api/v1/teams/{id}` | **Admin** | Remove. |
+| **POST** | `/api/v1/categories` | **Admin/Manager** | Cria Categoria. |
+| **GET** | `/api/v1/categories` | Autenticado | Lista (Pag/Busca/Sort). |
+| **GET** | `/api/v1/categories/{id}` | Autenticado | Detalhes Categoria. |
+| **PUT** | `/api/v1/categories/{id}` | **Admin/Manager** | Atualiza (Name/Desc). |
+| **DELETE**| `/api/v1/categories/{id}` | **Admin/Manager** | Remove Categoria. |
+| **GET** | `/api/v1/categories/count` | Autenticado | Conta Categorias. |
 | **POST** | `/api/v1/tickets` | Autenticado | Cria ticket + IA. |
 | **GET** | `/api/v1/tickets` | Autenticado | Lista (Busca: Título/Desc/Code `TKT-`). |
 | **GET** | `/api/v1/tickets/{id}` | Autenticado | Detalhes. |
@@ -72,5 +78,5 @@ A documentação interativa (Swagger UI) está disponível em:
 
 1. **Registrar Tenant**: Crie uma organização e um usuário admin.
 2. **Login**: Faça login com esse usuário para obter o Token.
-3. **Criar Ticket**: Use o token para criar um ticket. O campo `priority`, `sentiment` e `category` serão preenchidos automaticamente pela IA em background.
+3. **Criar Ticket**: Use o token para criar um ticket. O campo `title` (refinado), `priority`, `sentiment` e `category` serão preenchidos automaticamente pela IA em background.
 4. **Verificar IA**: Consulte o ticket criado e veja os campos preenchidos.

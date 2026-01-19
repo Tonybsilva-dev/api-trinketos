@@ -19,6 +19,7 @@ public class TicketAIService {
 
   private final ChatClient.Builder chatClientBuilder;
   private final TicketRepository ticketRepository;
+  private final com.trinket.trinketos.repository.CategoryRepository categoryRepository;
 
   public String processText(String text, com.trinket.trinketos.model.AIInstructionType instruction) {
     ChatClient chatClient = chatClientBuilder.build();
@@ -41,7 +42,10 @@ public class TicketAIService {
     return chatClient.prompt()
         .system(systemPrompt)
         .user("Texto original: " + text)
-        .options(org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder().temperature(0.1).build())
+        .options(org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder()
+            .model("gemini-3-flash-preview")
+            .temperature(0.1)
+            .build())
         .call()
         .content();
   }
@@ -56,21 +60,32 @@ public class TicketAIService {
 
     ChatClient chatClient = chatClientBuilder.build();
 
+    // Fetch existing categories
+    java.util.List<String> categories = categoryRepository.findByOrganizationId(ticket.getOrganizationId())
+        .stream().map(com.trinket.trinketos.model.Category::getName).toList();
+    String categoriesStr = String.join(", ", categories);
+
     // Prompt for JSON analysis
+    String systemPrompt = """
+        Atue como um especialista em suporte técnico. Analise o ticket abaixo e retorne um JSON com:
+        {
+          "title": "(String: Um título profissional, curto e direto para o ticket)",
+          "sentiment": "(String: Positivo, Neutro ou Frustrado/Urgente)",
+          "priority": "(String: LOW, MEDIUM, HIGH, CRITICAL)",
+          "category": "(String: Escolha uma das seguintes: [%s]. Se nenhuma se encaixar, sugira uma nova)",
+          "diagnosis": "(Resumo técnico da provável causa - Max 2 linhas)",
+          "suggested_solution": "(Passo a passo para o agente resolver)"
+        }
+        Retorne APENAS o JSON.
+        """.formatted(categoriesStr);
+
     String response = chatClient.prompt()
-        .system("""
-            Atue como um especialista em suporte técnico. Analise o ticket abaixo e retorne um JSON com:
-            {
-              "sentiment": "(String: Positivo, Neutro ou Frustrado/Urgente)",
-              "priority": "(String: LOW, MEDIUM, HIGH, CRITICAL)",
-              "category": "(String: Bug, Financeiro, Infraestrutura, Dúvida)",
-              "diagnosis": "(Resumo técnico da provável causa - Max 2 linhas)",
-              "suggested_solution": "(Passo a passo para o agente resolver)"
-            }
-            Retorne APENAS o JSON.
-            """)
+        .system(systemPrompt)
         .user("Ticket: " + ticket.getTitle() + " - " + ticket.getDescription())
-        .options(org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder().temperature(0.1).build())
+        .options(org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder()
+            .model("gemini-3-flash-preview")
+            .temperature(0.1)
+            .build())
         .call()
         .content();
 
@@ -83,6 +98,8 @@ public class TicketAIService {
       com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
       com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(cleanJson);
 
+      if (root.has("title"))
+        ticket.setTitle(root.get("title").asText());
       if (root.has("sentiment"))
         ticket.setSentiment(root.get("sentiment").asText());
       if (root.has("category"))

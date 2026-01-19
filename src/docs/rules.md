@@ -75,9 +75,10 @@ O sistema integra com o **Google Gemini** para automação e auxílio na produti
 -   **Capabilities**:
     1.  **Sensibilidade (Sentiment Analysis)**: Define como Positivo, Negativo ou Neutro.
     2.  **Prioridade Sugerida**: Define `LOW`, `MEDIUM`, `HIGH` ou `CRITICAL` baseado na urgência.
-    3.  **Categorização**: Sugere uma categoria (ex: "Hardware", "Billing").
-    4.  **Diagnóstico Técnico**: Breve resumo da provável causa raiz.
-    5.  **Solução Sugerida**: Passo a passo de resolução para o agente.
+    3.  **Categorização**: Busca categorias existentes no banco e associa a mais adequada. Se nenhuma servir, pode sugerir nova.
+    4.  **Título Refinado**: Reescreve o título para ser mais técnico e conciso.
+    5.  **Diagnóstico Técnico**: Breve resumo da provável causa raiz.
+    6.  **Solução Sugerida**: Passo a passo de resolução para o agente.
 -   **Resultado**: O ticket é atualizado no banco de dados com essas informações.
 
 ---
@@ -108,7 +109,23 @@ Endpoints dedicados à visualização de performance (Dashboards).
 
 ---
 
-### 7. Gestão de Times
+---
+ 
+ ## 6. Gestão de Categorias
+ 
+ *   **Padrão**: Criar Categoria `POST /api/v1/categories`.
+ *   **Padrão**: Listar `GET /api/v1/categories` (Paginado, Busca por nome/descrição, Ordenação).
+ *   **Padrão**: Detalhes `GET /api/v1/categories/{id}`.
+ *   **Padrão**: Atualizar `PUT /api/v1/categories/{id}` (Nome e Descrição).
+ *   **Padrão**: Remover `DELETE /api/v1/categories/{id}`.
+ *   **Padrão**: Contar `GET /api/v1/categories/count`.
+ *   **Regra**: Apenas **Admin** ou **Manager** pode criar/atualizar/deletar.
+ *   **Regra**: Categorias são isoladas por Organização.
+ *   **Uso**: O sistema de IA utiliza essas categorias cadastradas para classificar automaticamente os tickets.
+ 
+ ---
+ 
+ ### 7. Gestão de Times
 
 *   **Padrão**: Criar Time `POST /api/v1/teams` (Gera slug automático).
 *   **Padrão**: Listar Times `GET /api/v1/teams` (Paginado, Busca).
@@ -169,6 +186,12 @@ Endpoints dedicados à visualização de performance (Dashboards).
 | **PUT** | `/api/v1/teams/{id}` | **Admin** | Atualiza Time. |
 | **DELETE**| `/api/v1/teams/{id}` | **Admin** | Remove Time. |
 | **GET** | `/api/v1/teams/count` | Autenticado | Conta Times. |
+| **POST** | `/api/v1/categories` | **Admin/Manager** | Cria Categoria. |
+| **GET** | `/api/v1/categories` | Autenticado | Lista (Pag/Busca/Sort). | 
+| **GET** | `/api/v1/categories/{id}` | Autenticado | Detalhes Categoria. |
+| **PUT** | `/api/v1/categories/{id}` | **Admin/Manager** | Atualiza Categoria. |
+| **DELETE**| `/api/v1/categories/{id}` | **Admin/Manager** | Remove Categoria. |
+| **GET** | `/api/v1/categories/count` | Autenticado | Conta Categorias. |
 | **POST** | `/api/v1/tickets` | Autenticado | Cria ticket + Dispara IA. |
 | **GET** | `/api/v1/tickets` | Autenticado | Lista tickets (Pag/Busca). |
 | **GET** | `/api/v1/tickets/{id}` | Autenticado | Detalhes do Ticket. |
