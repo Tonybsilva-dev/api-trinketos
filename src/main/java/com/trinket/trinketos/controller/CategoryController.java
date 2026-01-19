@@ -83,9 +83,13 @@ public class CategoryController {
     }
 
     if (request.getName() != null) {
+      com.trinket.trinketos.util.StringUtils.validateString(request.getName(), "Name",
+          com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
       category.setName(request.getName());
     }
     if (request.getDescription() != null) {
+      com.trinket.trinketos.util.StringUtils.validateString(request.getDescription(), "Description",
+          com.trinket.trinketos.util.StringUtils.ValidationMode.DESCRIPTION_NO_EMOJI, true);
       category.setDescription(request.getDescription());
     }
 
@@ -106,6 +110,11 @@ public class CategoryController {
   @Operation(summary = "Create a new category")
   public ResponseEntity<Category> createCategory(@RequestBody Category category, Authentication authentication) {
     User user = getUser(authentication);
+    com.trinket.trinketos.util.StringUtils.validateString(category.getName(), "Name",
+        com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
+    com.trinket.trinketos.util.StringUtils.validateString(category.getDescription(), "Description",
+        com.trinket.trinketos.util.StringUtils.ValidationMode.DESCRIPTION_NO_EMOJI, true);
+
     category.setOrganizationId(user.getOrganizationId());
     return ResponseEntity.ok(categoryRepository.save(category));
   }
@@ -130,4 +139,5 @@ public class CategoryController {
     return userRepository.findByEmail(userDetails.getUsername())
         .orElseThrow(() -> new RuntimeException("User not found"));
   }
+
 }

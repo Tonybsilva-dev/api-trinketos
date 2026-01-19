@@ -50,10 +50,14 @@ public class TeamController {
     String name = normalizeText(request.name());
     String displayName = normalizeText(request.displayName());
 
-    validateName(name, "Name");
+    com.trinket.trinketos.util.StringUtils.validateString(name, "Name",
+        com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
     if (displayName != null) {
-      validateName(displayName, "Display Name");
+      com.trinket.trinketos.util.StringUtils.validateString(displayName, "Display Name",
+          com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
     }
+    com.trinket.trinketos.util.StringUtils.validateString(request.description(), "Description",
+        com.trinket.trinketos.util.StringUtils.ValidationMode.DESCRIPTION_NO_EMOJI, true);
 
     String slug = com.trinket.trinketos.util.SlugUtils.toSlug(name);
     if (teamRepository.existsBySlugAndOrganizationId(slug, admin.getOrganizationId())) {
@@ -133,10 +137,14 @@ public class TeamController {
     String name = normalizeText(request.name());
     String displayName = normalizeText(request.displayName());
 
-    validateName(name, "Name");
+    com.trinket.trinketos.util.StringUtils.validateString(name, "Name",
+        com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
     if (displayName != null) {
-      validateName(displayName, "Display Name");
+      com.trinket.trinketos.util.StringUtils.validateString(displayName, "Display Name",
+          com.trinket.trinketos.util.StringUtils.ValidationMode.STRICT_NAME, true);
     }
+    com.trinket.trinketos.util.StringUtils.validateString(request.description(), "Description",
+        com.trinket.trinketos.util.StringUtils.ValidationMode.DESCRIPTION_NO_EMOJI, true);
 
     team.setName(name);
     team.setDisplayName(displayName);
@@ -186,11 +194,29 @@ public class TeamController {
   }
 
   private void validateName(String value, String fieldName) {
-    // Allow unicode letters, numbers and spaces. No special symbols or emojis.
-    String regex = "^[\\p{L}0-9\\s]+$";
+    // Allow unicode letters (including marks/accents), numbers, spaces (including
+    // NBSP), and common
+    // punctuation (-, _, ., (, )).
+    String regex = "^[\\p{L}\\p{M}0-9\\p{Z}\\.\\-\\_\\(\\)]+$";
     if (value == null || !value.matches(regex)) {
       throw new IllegalArgumentException(
-          fieldName + " contains invalid characters. Only letters, numbers and spaces are allowed.");
+          String.format(
+              "The field '%s' contains invalid characters. Value received: '%s'. Only letters, numbers, spaces, and common punctuation (-, _, ., (, )) are allowed.",
+              fieldName, value));
+    }
+  }
+
+  private void validateDescription(String value, String fieldName) {
+    if (value == null || value.isBlank())
+      return;
+    // Allow Letters, Marks, Numbers, Punctuation, Separators, Math Symbols,
+    // Currency Symbols.
+    // Excludes \p{So} (Symbol, other) which contains most Emojis.
+    // Also explicitly allows newlines (\n, \r).
+    String regex = "^[\\p{L}\\p{M}\\p{N}\\p{P}\\p{Z}\\p{Sm}\\p{Sc}\\n\\r]+$";
+    if (!value.matches(regex)) {
+      throw new IllegalArgumentException(
+          String.format("The field '%s' contains invalid characters (Emojis are not allowed).", fieldName));
     }
   }
 
