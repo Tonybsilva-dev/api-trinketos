@@ -1,19 +1,19 @@
 package com.trinket.trinketos.dto;
 
-import com.trinket.trinketos.model.Role;
-import java.util.UUID;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 public record RegisterRequest(
-    String name,
-    String email,
-    String password,
-    Role role,
-    UUID organizationId // In some flows admin might set this implicit from their own, but for super
-                        // admin maybe explicit?
-                        // User says: "Apenas o ADMIN de uma organização pode cadastrar... garantindo
-                        // organization_id igual".
-                        // So the Admin sends name, email, password, role. Id is implicit.
-                        // I will keep it flexible or make it optional in DTO, but for the endpoint
-                        // logic I will enforce matching context.
-) {
+                @Schema(description = "User's full name", example = "John Doe") String name,
+
+                @Schema(description = "User's email address", example = "john@example.com") String email,
+
+                @Schema(description = "User's password", example = "securePassword123!") String password,
+
+                @Schema(description = "Role (ADMIN, AGENT, CUSTOMER)", example = "ROLE_AGENT") com.trinket.trinketos.model.Role role,
+
+                @Schema(hidden = true) java.util.UUID organizationId,
+
+                @Schema(description = "Team ID (Required for Agents to access tickets)", example = "d290f1ee-6c54-4b01-90e6-d701748f0851") java.util.UUID teamId,
+
+                @Schema(description = "Document (CPF or CNPJ). Digits only. Auto-detected by length (11=CPF, 14=CNPJ).", example = "12345678901") String document) {
 }

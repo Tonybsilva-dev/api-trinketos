@@ -20,10 +20,28 @@ public class TicketAIService {
   private final ChatClient.Builder chatClientBuilder;
   private final TicketRepository ticketRepository;
 
-  public String refineDescription(String draft) {
+  public String processText(String text, com.trinket.trinketos.model.AIInstructionType instruction) {
     ChatClient chatClient = chatClientBuilder.build();
+
+    String systemPrompt = """
+        Reescreva o seguinte problema de suporte técnico para torná-lo profissional, estruturado e claro.
+        Use o formato:
+        Contexto: [Breve explicação]
+        Problema: [O que não está funcionando]
+        Impacto: [Como isso afeta o usuário]
+
+        Mantenha um tom neutro e técnico.
+        """;
+
+    if (instruction == com.trinket.trinketos.model.AIInstructionType.SUMMARIZE) {
+      systemPrompt = "Resuma o texto abaixo de forma concisa em um único parágrafo, focando nos pontos principais para um agente de suporte.";
+    }
+
+    // User requested Temperature 0.1 for better assertiveness
     return chatClient.prompt()
-        .user("Refine the following ticket description to be professional, detailed, and clear: " + draft)
+        .system(systemPrompt)
+        .user("Texto original: " + text)
+        .options(org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder().temperature(0.1).build())
         .call()
         .content();
   }
@@ -38,43 +56,51 @@ public class TicketAIService {
 
     ChatClient chatClient = chatClientBuilder.build();
 
-    // We can ask for JSON or specific format, or just Ask 3 questions.
-    // For simplicity, I'll ask for a structured string or handle loose parsing.
-    // Prompt: "Analyze this ticket: [desc]. Return strictly in format: Sentiment:
-    // [S]; Category: [C]; Priority: [P]."
-
+    // Prompt for JSON analysis
     String response = chatClient.prompt()
-        .system(
-            "You are a helpful support assistant. Analyze the ticket content. Return the Sentiment (Frustrated, Neutral, Happy), Category (Bug, Finance, Support, Feature), and Priority (LOW, MEDIUM, HIGH, CRITICAL). Format: Sentiment: X; Category: Y; Priority: Z.")
-        .user("Title: " + ticket.getTitle() + "\nDescription: " + ticket.getDescription())
+        .system("""
+            Atue como um especialista em suporte técnico. Analise o ticket abaixo e retorne um JSON com:
+            {
+              "sentiment": "(String: Positivo, Neutro ou Frustrado/Urgente)",
+              "priority": "(String: LOW, MEDIUM, HIGH, CRITICAL)",
+              "category": "(String: Bug, Financeiro, Infraestrutura, Dúvida)",
+              "diagnosis": "(Resumo técnico da provável causa - Max 2 linhas)",
+              "suggested_solution": "(Passo a passo para o agente resolver)"
+            }
+            Retorne APENAS o JSON.
+            """)
+        .user("Ticket: " + ticket.getTitle() + " - " + ticket.getDescription())
+        .options(org.springframework.ai.google.genai.GoogleGenAiChatOptions.builder().temperature(0.1).build())
         .call()
         .content();
 
     log.info("AI Analysis result: {}", response);
 
-    // Simple parsing logic (robustness would require JSON mode or better parsing)
     try {
-      String[] parts = response.split(";");
-      for (String part : parts) {
-        String[] kv = part.trim().split(":");
-        if (kv.length < 2)
-          continue;
-        String key = kv[0].trim().toLowerCase();
-        String value = kv[1].trim();
+      // Removing Markdown code blocks (```json ... ```) if present
+      String cleanJson = response.replaceAll("```json", "").replaceAll("```", "").trim();
 
-        if (key.contains("sentiment")) {
-          ticket.setSentiment(value);
-        } else if (key.contains("category")) {
-          ticket.setCategory(value);
-        } else if (key.contains("priority")) {
-          try {
-            ticket.setPriority(Priority.valueOf(value.toUpperCase()));
-          } catch (IllegalArgumentException e) {
-            // Keep default or fallback
-            log.warn("Could not parse priority: {}", value);
-          }
+      com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+      com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(cleanJson);
+
+      if (root.has("sentiment"))
+        ticket.setSentiment(root.get("sentiment").asText());
+      if (root.has("category"))
+        ticket.setCategory(root.get("category").asText());
+      if (root.has("diagnosis"))
+        ticket.setDiagnosis(root.get("diagnosis").asText());
+      if (root.has("suggested_solution"))
+        ticket.setSuggestedSolution(root.get("suggested_solution").asText());
+
+      if (root.has("priority")) {
+        String p = root.get("priority").asText().toUpperCase();
+        try {
+          ticket.setPriority(Priority.valueOf(p));
+        } catch (IllegalArgumentException e) {
+          log.warn("Could not parse priority: {}", p);
         }
       }
+
       ticketRepository.save(ticket);
     } catch (Exception e) {
       log.error("Error parsing AI response", e);

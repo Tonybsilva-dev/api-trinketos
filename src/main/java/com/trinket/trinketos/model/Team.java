@@ -5,16 +5,19 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(name = "teams")
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class User {
+public class Team {
 
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,26 +26,22 @@ public class User {
   @Column(nullable = false)
   private String name;
 
-  @Column(nullable = false, unique = true)
-  private String email;
+  @Column(name = "display_name")
+  private String displayName;
 
   @Column(nullable = false)
-  private String password;
+  private String slug;
 
-  @Enumerated(EnumType.STRING)
-  @Column(nullable = false)
-  private Role role;
+  @Column(columnDefinition = "TEXT")
+  private String description;
 
   @Column(name = "organization_id", nullable = false)
   private UUID organizationId;
 
-  @Column(name = "team_id")
-  private UUID teamId;
+  @CreationTimestamp
+  @Column(updatable = false)
+  private LocalDateTime createdAt;
 
-  @Column(name = "document")
-  private String document;
-
-  @Enumerated(EnumType.STRING)
-  @Column(name = "document_type")
-  private DocumentType documentType;
+  @UpdateTimestamp
+  private LocalDateTime updatedAt;
 }

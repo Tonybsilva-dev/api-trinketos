@@ -21,10 +21,16 @@ public class AIController {
 
   private final TicketAIService ticketAIService;
 
-  @PostMapping("/refine")
-  @Operation(summary = "Refine ticket description using AI")
-  public ResponseEntity<Map<String, String>> refine(@RequestBody RefineRequest request) {
-    String refined = ticketAIService.refineDescription(request.draft());
-    return ResponseEntity.ok(Map.of("refined", refined));
+  @PostMapping("/process")
+  @Operation(summary = "Process text (Refine or Summarize) using AI", responses = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Text processed successfully"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid request"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
+  })
+  public ResponseEntity<Map<String, String>> processText(@RequestBody RefineRequest request) {
+    var instruction = request.instruction() != null ? request.instruction()
+        : com.trinket.trinketos.model.AIInstructionType.REFINE;
+    String result = ticketAIService.processText(request.text(), instruction);
+    return ResponseEntity.ok(Map.of("result", result));
   }
 }

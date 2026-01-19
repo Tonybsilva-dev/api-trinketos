@@ -1,4 +1,6 @@
 package com.trinket.trinketos.dto;
 
-public record RefineRequest(String draft) {
+import com.trinket.trinketos.model.AIInstructionType;
+
+public record RefineRequest(String text, AIInstructionType instruction) {
 }

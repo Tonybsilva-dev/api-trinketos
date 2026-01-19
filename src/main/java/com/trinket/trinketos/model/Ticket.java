@@ -25,6 +25,9 @@ public class Ticket {
   @Column(nullable = false)
   private String title;
 
+  @Column(unique = true, nullable = false)
+  private String code; // TKT-1234ABCD
+
   @Column(columnDefinition = "TEXT")
   private String description;
 
@@ -38,14 +41,26 @@ public class Ticket {
 
   private String sentiment;
 
+  @Column(columnDefinition = "TEXT")
+  private String diagnosis;
+
+  @Column(columnDefinition = "TEXT")
+  private String suggestedSolution;
+
   @Column(name = "customer_id")
   private UUID customerId;
 
   @Column(name = "agent_id")
   private UUID agentId;
 
+  @Column(name = "team_id")
+  private UUID teamId;
+
   @Column(name = "organization_id", nullable = false)
   private UUID organizationId;
+
+  @Column(name = "resolved_at")
+  private LocalDateTime resolvedAt;
 
   @CreationTimestamp
   @Column(updatable = false)

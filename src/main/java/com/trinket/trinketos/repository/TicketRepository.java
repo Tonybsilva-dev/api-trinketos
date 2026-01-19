@@ -7,8 +7,12 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
 @Repository
-public interface TicketRepository extends JpaRepository<Ticket, UUID> {
+public interface TicketRepository extends JpaRepository<Ticket, UUID>, JpaSpecificationExecutor<Ticket> {
+  boolean existsByCode(String code);
+
   List<Ticket> findByOrganizationId(UUID organizationId);
 
   List<Ticket> findByCustomerId(UUID customerId);

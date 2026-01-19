@@ -29,21 +29,32 @@ public class AuthController {
   private final UserRepository userRepository;
 
   @PostMapping("/register-tenant")
-  @Operation(summary = "Register a new Organization (Tenant) and Admin")
+  @Operation(summary = "Register a new Organization (Tenant) and Admin", responses = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Organization created successfully"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Organization slug or Admin email already exists")
+  })
   public ResponseEntity<AuthResponse> registerTenant(@RequestBody TenantRegisterRequest request) {
     return ResponseEntity.ok(service.registerTenant(request));
   }
 
   @PostMapping("/login")
-  @Operation(summary = "Login to get JWT")
+  @Operation(summary = "Login to get JWT", responses = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Authentication successful"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid credentials")
+  })
   public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
     return ResponseEntity.ok(service.authenticate(request));
   }
 
   @PostMapping("/register-user")
   @PreAuthorize("hasRole('ROLE_ADMIN')")
-  @Operation(summary = "Register a new user (Agent/Customer) for the organization")
-  public ResponseEntity<User> registerUser(
+  @Operation(summary = "Register a new user (Agent/Customer) for the organization", responses = {
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User registered successfully"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "Invalid input (e.g. invalid Document format)"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Forbidden: Only Admin can register users"),
+      @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "Email already exists")
+  })
+  public ResponseEntity<AuthResponse> registerUser(
       @RequestBody RegisterRequest request,
       @AuthenticationPrincipal UserDetails userDetails) {
     // Fetch full admin user to get OrganizationID

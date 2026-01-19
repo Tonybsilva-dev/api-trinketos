@@ -21,66 +21,96 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthenticationService {
 
-  private final UserRepository userRepository;
-  private final OrganizationRepository organizationRepository;
-  private final PasswordEncoder passwordEncoder;
-  private final JwtService jwtService;
-  private final AuthenticationManager authenticationManager;
+        private final UserRepository userRepository;
+        private final OrganizationRepository organizationRepository;
+        private final PasswordEncoder passwordEncoder;
+        private final JwtService jwtService;
+        private final AuthenticationManager authenticationManager;
 
-  @Transactional
-  public AuthResponse registerTenant(TenantRegisterRequest request) {
-    var organization = Organization.builder()
-        .name(request.organizationName())
-        .slug(request.organizationSlug())
-        .build();
-    organizationRepository.save(organization);
+        @Transactional
+        public AuthResponse registerTenant(TenantRegisterRequest request) {
+                var organization = Organization.builder()
+                                .name(request.organizationName())
+                                .slug(request.organizationSlug())
+                                .build();
+                organizationRepository.save(organization);
 
-    var user = User.builder()
-        .name(request.adminName())
-        .email(request.adminEmail())
-        .password(passwordEncoder.encode(request.adminPassword()))
-        .role(Role.ROLE_ADMIN)
-        .organizationId(organization.getId())
-        .build();
-    userRepository.save(user);
+                var user = User.builder()
+                                .name(request.adminName())
+                                .email(request.adminEmail())
+                                .password(passwordEncoder.encode(request.adminPassword()))
+                                .role(Role.ROLE_ADMIN)
+                                .organizationId(organization.getId())
+                                .build();
+                userRepository.save(user);
 
-    // Standard user details adapter
-    var userDetails = new org.springframework.security.core.userdetails.User(
-        user.getEmail(),
-        user.getPassword(),
-        java.util.List
-            .of(new org.springframework.security.core.authority.SimpleGrantedAuthority(user.getRole().name())));
+                // Standard user details adapter
+                var userDetails = new org.springframework.security.core.userdetails.User(
+                                user.getEmail(),
+                                user.getPassword(),
+                                java.util.List
+                                                .of(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                user.getRole().name())));
 
-    var jwtToken = jwtService.generateToken(userDetails, user.getOrganizationId(), user.getRole().name());
-    return new AuthResponse(jwtToken, user.getId(), user.getName(), user.getEmail(), user.getRole(),
-        user.getOrganizationId());
-  }
+                var jwtToken = jwtService.generateToken(userDetails, user.getOrganizationId(), user.getRole().name());
+                return new AuthResponse(jwtToken, user.getId(), user.getName(), user.getEmail(), user.getRole(),
+                                user.getOrganizationId());
+        }
 
-  public AuthResponse authenticate(LoginRequest request) {
-    authenticationManager.authenticate(
-        new UsernamePasswordAuthenticationToken(request.email(), request.password()));
-    var user = userRepository.findByEmail(request.email())
-        .orElseThrow();
+        public AuthResponse authenticate(LoginRequest request) {
+                authenticationManager.authenticate(
+                                new UsernamePasswordAuthenticationToken(request.email(), request.password()));
+                var user = userRepository.findByEmail(request.email())
+                                .orElseThrow();
 
-    var userDetails = new org.springframework.security.core.userdetails.User(
-        user.getEmail(),
-        user.getPassword(),
-        java.util.List
-            .of(new org.springframework.security.core.authority.SimpleGrantedAuthority(user.getRole().name())));
+                var userDetails = new org.springframework.security.core.userdetails.User(
+                                user.getEmail(),
+                                user.getPassword(),
+                                java.util.List
+                                                .of(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                user.getRole().name())));
 
-    var jwtToken = jwtService.generateToken(userDetails, user.getOrganizationId(), user.getRole().name());
-    return new AuthResponse(jwtToken, user.getId(), user.getName(), user.getEmail(), user.getRole(),
-        user.getOrganizationId());
-  }
+                var jwtToken = jwtService.generateToken(userDetails, user.getOrganizationId(), user.getRole().name());
+                return new AuthResponse(jwtToken, user.getId(), user.getName(), user.getEmail(), user.getRole(),
+                                user.getOrganizationId());
+        }
 
-  public User registerUser(RegisterRequest request, User admin) {
-    var user = User.builder()
-        .name(request.name())
-        .email(request.email())
-        .password(passwordEncoder.encode(request.password()))
-        .role(request.role())
-        .organizationId(admin.getOrganizationId()) // Enforce Admin's Org
-        .build();
-    return userRepository.save(user);
-  }
+        public AuthResponse registerUser(RegisterRequest request, User adminUser) {
+                var userBuilder = User.builder()
+                                .name(request.name())
+                                .email(request.email())
+                                .password(passwordEncoder.encode(request.password()))
+                                .role(request.role())
+                                .organizationId(adminUser.getOrganizationId()) // Enforce Admin's Org
+                                .teamId(request.teamId());
+
+                if (request.document() != null && !request.document().isBlank()) {
+                        String cleanDoc = request.document().replaceAll("\\D", "");
+                        if (cleanDoc.length() == 11) {
+                                userBuilder.document(cleanDoc);
+                                userBuilder.documentType(com.trinket.trinketos.model.DocumentType.CPF);
+                        } else if (cleanDoc.length() == 14) {
+                                userBuilder.document(cleanDoc);
+                                userBuilder.documentType(com.trinket.trinketos.model.DocumentType.CNPJ);
+                        } else {
+                                throw new IllegalArgumentException(
+                                                "Documento inválido. Deve ter 11 (CPF) ou 14 (CNPJ) dígitos.");
+                        }
+                }
+
+                var user = userBuilder.build();
+                userRepository.save(user);
+
+                // Standard user details adapter
+                var userDetails = new org.springframework.security.core.userdetails.User(
+                                user.getEmail(),
+                                user.getPassword(),
+                                java.util.List
+                                                .of(new org.springframework.security.core.authority.SimpleGrantedAuthority(
+                                                                user.getRole().name())));
+
+                var jwtToken = jwtService.generateToken(userDetails, user.getOrganizationId(), user.getRole().name());
+                return new AuthResponse(jwtToken, user.getId(), user.getName(), user.getEmail(), user.getRole(),
+                                user.getOrganizationId());
+        }
 }

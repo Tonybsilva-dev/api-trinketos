@@ -39,13 +39,30 @@ A documentação interativa (Swagger UI) está disponível em:
 
 ### Principais Endpoints
 
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| POST | `/api/v1/auth/register-tenant` | Registra nova Organização e Admin |
-| POST | `/api/v1/auth/login` | Login (Retorna JWT) |
-| POST | `/api/v1/tickets` | Cria ticket (+ Análise IA automática) |
-| GET | `/api/v1/tickets` | Lista tickets da organização |
-| POST | `/api/v1/ai/refine` | Refina texto de descrição com IA |
+| Método | Endpoint | Proteção | Descrição |
+|---|---|---|---|
+| **POST** | `/api/v1/auth/register-tenant` | **Público** | Cria Empresa + Admin. |
+| **POST** | `/api/v1/auth/login` | **Público** | Autentica e gera Token. |
+| **POST** | `/api/v1/auth/register-user` | **Admin** | Admin cria Agentes/Clientes. |
+| **POST** | `/api/v1/teams` | **Admin** | Cria Time (Auto Slug). |
+| **GET** | `/api/v1/teams` | Autenticado | Lista (Pag/Busca). |
+| **GET** | `/api/v1/teams/{id}` | Autenticado | Detalhes. |
+| **PUT** | `/api/v1/teams/{id}` | **Admin** | Atualiza. |
+| **DELETE**| `/api/v1/teams/{id}` | **Admin** | Remove. |
+| **POST** | `/api/v1/tickets` | Autenticado | Cria ticket + IA. |
+| **GET** | `/api/v1/tickets` | Autenticado | Lista (Busca: Título/Desc/Code `TKT-`). |
+| **GET** | `/api/v1/tickets/{id}` | Autenticado | Detalhes. |
+| **PUT** | `/api/v1/tickets/{id}` | Autenticado | Atualiza. |
+| **DELETE**| `/api/v1/tickets/{id}` | **Admin** | Remove. |
+| **POST** | `/api/v1/ai/process` | Autenticado | IA (Refina/Resume). |
+| **GET** | `/api/v1/analytics/dashboard` | Autenticado | Resumo de métricas. |
+| **GET** | `/api/v1/analytics/dashboard` | Autenticado | Resumo de métricas. |
+| **GET** | `/api/v1/analytics/advanced` | Autenticado | Métricas detalhadas. |
+| **GET** | `/api/v1/users` | Autenticado | Lista Usuários. |
+| **GET** | `/api/v1/users/{id}` | Autenticado | Detalhes Usuários. |
+| **PUT** | `/api/v1/users/{id}` | **Admin** | Atualiza Usuários. |
+| **DELETE**| `/api/v1/users/{id}` | **Admin** | Remove Usuários. |
+| **GET** | `/api/v1/users/count` | Autenticado | Conta Usuários (Filtro). |
 
 > **Nota:** Para os endpoints protegidos, copie o token JWT retornado no login e use o botão "Authorize" no Swagger.
 
