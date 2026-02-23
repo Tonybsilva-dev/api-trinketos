@@ -1,0 +1,44 @@
+chore: commit inicial - API TrinketOS (Spring Boot)
+
+Backend do sistema SaaS de tickets multi-tenant com suporte a IA.
+
+Stack e configuração
+--------------------
+- Java 21, Spring Boot 3.x, Spring Security (JWT), Spring Data JPA
+- PostgreSQL; configuração via application.yaml e variáveis de ambiente
+- Perfil dev: DB_URL, DB_USERNAME, DB_PASSWORD (defaults localhost)
+- Dotenv no TrinketosApplication.main para carregar .env (sem export)
+- .env.example com GOOGLE_GEMINI_API_KEY, JWT_SECRET, spring.profiles.active, DB_*
+
+Segurança e autenticação
+------------------------
+- SecurityConfig: rotas públicas (login, register-tenant), demais com JWT
+- AuthController: POST /api/v1/auth/login, POST /api/v1/auth/register-tenant
+- LoginRequest / AuthResponse; TenantRegisterRequest com organizationName, slug,
+  documentType (CPF/CNPJ), taxId obrigatório, admin (name, email, password)
+- Validação no AuthenticationService: documentType e taxId obrigatórios;
+  taxId normalizado (só dígitos); CPF 11 dígitos, CNPJ 14 dígitos
+
+Modelo de dados
+---------------
+- Organization: documentType (enum), taxId (único), name, slug
+- User, Team, Category, Ticket (Status, Priority); Role, DocumentType
+- Repositórios: OrganizationRepository, UserRepository, TeamRepository,
+  CategoryRepository, TicketRepository
+
+Endpoints e DTOs
+---------------
+- Auth: login, register-tenant
+- Users: CRUD, UserResponse, UserUpdateRequest
+- Teams: CRUD, TeamRequest, TeamResponse
+- Categories: CRUD
+- Tickets: CRUD, TicketRequest, TicketResponse; filtros e paginação
+- Analytics: AnalyticsController, AnalyticsResponse, TimePeriod
+- AI: AIController, RefineRequest, integração Gemini (AIInstructionType)
+
+Outros
+------
+- GlobalExceptionHandler para respostas de erro padronizadas
+- OpenApiConfig (Swagger)
+- docker-compose para PostgreSQL
+- README com instruções de execução e tabela de endpoints

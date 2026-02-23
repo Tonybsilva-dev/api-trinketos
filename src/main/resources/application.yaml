@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: trinketos
+  profiles:
+    active: dev
+  ai:
+    google:
+      genai:
+        api-key: ${GOOGLE_GEMINI_API_KEY}
+        project-id: ${GOOGLE_GEMINI_PROJECT_ID:trinketos-ai}
+        location: us-central1
+        chat:
+          options:
+            model: gemini-3-flash
+
+application:
+  security:
+    jwt-secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    jwt-expiration: 86400000 # 1 day
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:password}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
