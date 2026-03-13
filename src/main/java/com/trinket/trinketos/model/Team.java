@@ -9,6 +9,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -38,6 +40,15 @@ public class Team {
   @Column(name = "organization_id", nullable = false)
   private UUID organizationId;
 
+  @ManyToMany
+  @JoinTable(
+    name = "team_categories",
+    joinColumns = @JoinColumn(name = "team_id"),
+    inverseJoinColumns = @JoinColumn(name = "category_id")
+  )
+  @Builder.Default
+  private Set<Category> categories = new HashSet<>();
+
   @CreationTimestamp
   @Column(updatable = false)
   private LocalDateTime createdAt;
@@ -45,3 +56,4 @@ public class Team {
   @UpdateTimestamp
   private LocalDateTime updatedAt;
 }
+
