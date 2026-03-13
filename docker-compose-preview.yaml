@@ -6,7 +6,7 @@ services:
     container_name: trinketos-api-preview
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "8081:8080"
     env_file:
       - .env.preview
  
