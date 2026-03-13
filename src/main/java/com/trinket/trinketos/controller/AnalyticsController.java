@@ -2,7 +2,9 @@ package com.trinket.trinketos.controller;
 
 import com.trinket.trinketos.dto.AnalyticsResponse;
 import com.trinket.trinketos.dto.TimePeriod;
+import com.trinket.trinketos.model.Role;
 import com.trinket.trinketos.model.User;
+import com.trinket.trinketos.repository.TeamRepository;
 import com.trinket.trinketos.repository.UserRepository;
 import com.trinket.trinketos.service.AnalyticsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -23,6 +26,7 @@ public class AnalyticsController {
 
   private final AnalyticsService analyticsService;
   private final UserRepository userRepository;
+  private final TeamRepository teamRepository;
 
   @GetMapping("/dashboard")
   @Operation(summary = "Get main dashboard metrics (Admin: All, Agent: Personal)", responses = {
@@ -35,10 +39,21 @@ public class AnalyticsController {
 
     User user = getUser(authentication);
 
-    // If Admin, get Org wide metrics. If Agent, get Personal metrics.
-    UUID agentIdFilter = "ROLE_AGENT".equals(user.getRole().name()) ? user.getId() : null;
+    // If Agent: filter by team visibility (team + handled categories)
+    // If Admin/other: show org-wide metrics
+    if (user.getRole() == Role.ROLE_AGENT) {
+      UUID teamId = user.getTeamId();
+      List<String> allowedCategories = teamId != null
+          ? teamRepository.findById(teamId)
+              .map(team -> team.getCategories().stream()
+                  .map(com.trinket.trinketos.model.Category::getName)
+                  .toList())
+              .orElse(List.of())
+          : List.of();
+      return ResponseEntity.ok(analyticsService.getAnalyticsByTeam(user.getOrganizationId(), teamId, allowedCategories, range));
+    }
 
-    return ResponseEntity.ok(analyticsService.getAnalytics(user.getOrganizationId(), agentIdFilter, range));
+    return ResponseEntity.ok(analyticsService.getAnalytics(user.getOrganizationId(), null, range));
   }
 
   @GetMapping("/advanced")

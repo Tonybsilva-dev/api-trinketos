@@ -32,6 +32,7 @@ public class TicketController {
 
   private final TicketRepository ticketRepository;
   private final UserRepository userRepository;
+  private final com.trinket.trinketos.repository.TeamRepository teamRepository;
   private final TicketAIService ticketAIService;
 
   @PostMapping
@@ -95,13 +96,26 @@ public class TicketController {
       // Mandatory: Organization
       predicates.add(cb.equal(root.get("organizationId"), user.getOrganizationId()));
 
-      // Agents can only see tickets assigned to their team
+      // Agents can only see tickets assigned to their team OR in categories handled by their team
       if (user.getRole() == Role.ROLE_AGENT) {
         if (user.getTeamId() == null) {
           // If agent has no team, they see no tickets
           predicates.add(cb.disjunction());
         } else {
-          predicates.add(cb.equal(root.get("teamId"), user.getTeamId()));
+          // Fetch team categories
+          var team = teamRepository.findById(user.getTeamId()).orElse(null);
+          List<String> categoryNames = (team != null) 
+              ? team.getCategories().stream().map(com.trinket.trinketos.model.Category::getName).toList() 
+              : List.of();
+
+          jakarta.persistence.criteria.Predicate teamPredicate = cb.equal(root.get("teamId"), user.getTeamId());
+          
+          if (!categoryNames.isEmpty()) {
+            jakarta.persistence.criteria.Predicate categoryPredicate = root.get("category").in(categoryNames);
+            predicates.add(cb.or(teamPredicate, categoryPredicate));
+          } else {
+            predicates.add(teamPredicate);
+          }
         }
       }
 
@@ -155,9 +169,18 @@ public class TicketController {
       return ResponseEntity.status(403).build();
     }
 
-    // Agent check: must be in the same team
+    // Agent check: must be in the same team OR handling the category
     if (currentUser.getRole() == Role.ROLE_AGENT) {
-      if (currentUser.getTeamId() == null || !currentUser.getTeamId().equals(ticket.getTeamId())) {
+      if (currentUser.getTeamId() == null) {
+        return ResponseEntity.status(403).build();
+      }
+      
+      boolean sameTeam = currentUser.getTeamId().equals(ticket.getTeamId());
+      var team = teamRepository.findById(currentUser.getTeamId()).orElse(null);
+      boolean handlesCategory = (team != null) && team.getCategories().stream()
+          .anyMatch(c -> c.getName().equals(ticket.getCategory()));
+
+      if (!sameTeam && !handlesCategory) {
         return ResponseEntity.status(403).build();
       }
     }
@@ -176,9 +199,18 @@ public class TicketController {
       return ResponseEntity.status(403).build();
     }
 
-    // Agent check
+    // Agent check: same team OR handles category
     if (currentUser.getRole() == Role.ROLE_AGENT) {
-      if (currentUser.getTeamId() == null || !currentUser.getTeamId().equals(ticket.getTeamId())) {
+      if (currentUser.getTeamId() == null) {
+        return ResponseEntity.status(403).build();
+      }
+
+      boolean sameTeam = currentUser.getTeamId().equals(ticket.getTeamId());
+      var team = teamRepository.findById(currentUser.getTeamId()).orElse(null);
+      boolean handlesCategory = (team != null) && team.getCategories().stream()
+          .anyMatch(c -> c.getName().equals(ticket.getCategory()));
+
+      if (!sameTeam && !handlesCategory) {
         return ResponseEntity.status(403).build();
       }
     }
@@ -224,7 +256,19 @@ public class TicketController {
         if (currentUser.getTeamId() == null) {
           predicates.add(cb.disjunction());
         } else {
-          predicates.add(cb.equal(root.get("teamId"), currentUser.getTeamId()));
+          var team = teamRepository.findById(currentUser.getTeamId()).orElse(null);
+          List<String> categoryNames = (team != null) 
+              ? team.getCategories().stream().map(com.trinket.trinketos.model.Category::getName).toList() 
+              : List.of();
+
+          jakarta.persistence.criteria.Predicate teamPredicate = cb.equal(root.get("teamId"), currentUser.getTeamId());
+          
+          if (!categoryNames.isEmpty()) {
+            jakarta.persistence.criteria.Predicate categoryPredicate = root.get("category").in(categoryNames);
+            predicates.add(cb.or(teamPredicate, categoryPredicate));
+          } else {
+            predicates.add(teamPredicate);
+          }
         }
       }
 
