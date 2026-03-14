@@ -9,5 +9,6 @@ public record AuthResponse(
     String name,
     String email,
     Role role,
-    UUID organizationId) {
+    UUID organizationId,
+    UUID teamId) {
 }

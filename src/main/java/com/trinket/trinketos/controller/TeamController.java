@@ -2,8 +2,12 @@ package com.trinket.trinketos.controller;
 
 import com.trinket.trinketos.dto.TeamRequest;
 import com.trinket.trinketos.dto.TeamResponse;
+import com.trinket.trinketos.dto.UserResponse;
+import com.trinket.trinketos.model.Category;
+import com.trinket.trinketos.model.Role;
 import com.trinket.trinketos.model.Team;
 import com.trinket.trinketos.model.User;
+import com.trinket.trinketos.repository.CategoryRepository;
 import com.trinket.trinketos.repository.TeamRepository;
 import com.trinket.trinketos.repository.UserRepository;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,9 +27,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import jakarta.persistence.criteria.Predicate;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/teams")
@@ -36,6 +39,7 @@ public class TeamController {
 
   private final TeamRepository teamRepository;
   private final UserRepository userRepository;
+  private final CategoryRepository categoryRepository;
 
   @PostMapping
   @PreAuthorize("hasRole('ROLE_ADMIN')")
@@ -82,6 +86,12 @@ public class TeamController {
         .description(request.description())
         .organizationId(admin.getOrganizationId())
         .build();
+
+    // Associate categories
+    if (request.categoryIds() != null && !request.categoryIds().isEmpty()) {
+      Set<Category> categories = new HashSet<>(categoryRepository.findAllById(request.categoryIds()));
+      team.setCategories(categories);
+    }
 
     Team saved = teamRepository.save(team);
     return ResponseEntity.ok(mapToResponse(saved));
@@ -161,8 +171,12 @@ public class TeamController {
           com.trinket.trinketos.util.StringUtils.ValidationMode.DESCRIPTION_NO_EMOJI, true);
       team.setDescription(request.description());
     }
-    // NOTE: Not updating slug on edit to preserve URLs, unless explicitly
-    // requested.
+
+    // Update categories
+    if (request.categoryIds() != null) {
+      Set<Category> categories = new HashSet<>(categoryRepository.findAllById(request.categoryIds()));
+      team.setCategories(categories);
+    }
 
     Team updated = teamRepository.save(team);
     return ResponseEntity.ok(mapToResponse(updated));
@@ -192,6 +206,94 @@ public class TeamController {
     return ResponseEntity.ok(count);
   }
 
+  // --- Team Members ---
+
+  @PutMapping("/{id}/members")
+  @PreAuthorize("hasRole('ROLE_ADMIN')")
+  @Operation(summary = "Assign an agent to a team")
+  public ResponseEntity<UserResponse> addMember(
+      @PathVariable UUID id,
+      @RequestBody Map<String, UUID> body,
+      Authentication authentication) {
+
+    User admin = getUser(authentication);
+    Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
+
+    if (!team.getOrganizationId().equals(admin.getOrganizationId())) {
+      return ResponseEntity.status(403).build();
+    }
+
+    UUID agentId = body.get("agentId");
+    if (agentId == null) {
+      throw new IllegalArgumentException("agentId is required");
+    }
+
+    User agent = userRepository.findById(agentId)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+
+    if (!agent.getOrganizationId().equals(admin.getOrganizationId())) {
+      return ResponseEntity.status(403).build();
+    }
+
+    if (agent.getRole() != Role.ROLE_AGENT) {
+      throw new IllegalArgumentException("Only agents can be assigned to teams");
+    }
+
+    agent.setTeamId(team.getId());
+    userRepository.save(agent);
+
+    return ResponseEntity.ok(mapUserToResponse(agent));
+  }
+
+  @GetMapping("/{id}/members")
+  @Operation(summary = "List team members")
+  public ResponseEntity<List<UserResponse>> getMembers(
+      @PathVariable UUID id,
+      Authentication authentication) {
+
+    User user = getUser(authentication);
+    Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
+
+    if (!team.getOrganizationId().equals(user.getOrganizationId())) {
+      return ResponseEntity.status(403).build();
+    }
+
+    List<User> members = userRepository.findAll((root, query, cb) -> cb.and(
+        cb.equal(root.get("teamId"), team.getId()),
+        cb.equal(root.get("organizationId"), user.getOrganizationId())
+    ));
+
+    return ResponseEntity.ok(members.stream().map(this::mapUserToResponse).collect(Collectors.toList()));
+  }
+
+  @DeleteMapping("/{id}/members/{userId}")
+  @PreAuthorize("hasRole('ROLE_ADMIN')")
+  @Operation(summary = "Remove an agent from a team")
+  public ResponseEntity<Void> removeMember(
+      @PathVariable UUID id,
+      @PathVariable UUID userId,
+      Authentication authentication) {
+
+    User admin = getUser(authentication);
+    Team team = teamRepository.findById(id).orElseThrow(() -> new RuntimeException("Team not found"));
+
+    if (!team.getOrganizationId().equals(admin.getOrganizationId())) {
+      return ResponseEntity.status(403).build();
+    }
+
+    User agent = userRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("User not found"));
+
+    if (!team.getId().equals(agent.getTeamId())) {
+      throw new IllegalArgumentException("User is not a member of this team");
+    }
+
+    agent.setTeamId(null);
+    userRepository.save(agent);
+
+    return ResponseEntity.noContent().build();
+  }
+
   private User getUser(Authentication authentication) {
     UserDetails userDetails = (UserDetails) authentication.getPrincipal();
     return userRepository.findByEmail(userDetails.getUsername())
@@ -206,7 +308,22 @@ public class TeamController {
   }
 
   private TeamResponse mapToResponse(Team t) {
+    List<UUID> categoryIds = t.getCategories() != null
+        ? t.getCategories().stream().map(Category::getId).collect(Collectors.toList())
+        : List.of();
     return new TeamResponse(t.getId(), t.getName(), t.getDisplayName(), t.getDescription(), t.getOrganizationId(),
-        t.getCreatedAt(), t.getUpdatedAt());
+        t.getCreatedAt(), t.getUpdatedAt(), categoryIds);
+  }
+
+  private UserResponse mapUserToResponse(User user) {
+    return new UserResponse(
+        user.getId(),
+        user.getName(),
+        user.getEmail(),
+        user.getRole(),
+        user.getOrganizationId(),
+        user.getTeamId(),
+        user.getDocument(),
+        user.getDocumentType());
   }
 }

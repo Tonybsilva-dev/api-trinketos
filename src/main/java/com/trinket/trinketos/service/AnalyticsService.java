@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -21,14 +22,34 @@ public class AnalyticsService {
 
   private final TicketRepository ticketRepository;
 
+  /**
+   * Get analytics filtered by agent's team visibility:
+   * tickets assigned to the team OR tickets in categories the team handles.
+   * If teamId is null, returns empty analytics (agent without a team sees nothing).
+   */
+  public AnalyticsResponse getAnalyticsByTeam(UUID organizationId, UUID teamId, List<String> allowedCategories, TimePeriod range) {
+    if (teamId == null) {
+      return emptyAnalytics();
+    }
+
+    LocalDateTime startDate = calculateStartDate(range);
+    List<Ticket> allTickets = ticketRepository.findByOrganizationId(organizationId);
+
+    List<Ticket> filtered = allTickets.stream()
+        .filter(t -> t.getCreatedAt().isAfter(startDate))
+        .filter(t -> {
+          boolean sameTeam = teamId.equals(t.getTeamId());
+          boolean handlesCategory = t.getCategory() != null && allowedCategories.contains(t.getCategory());
+          return sameTeam || handlesCategory;
+        })
+        .toList();
+
+    return buildAnalyticsResponse(filtered);
+  }
+
   public AnalyticsResponse getAnalytics(UUID organizationId, UUID agentId, TimePeriod range) {
     LocalDateTime startDate = calculateStartDate(range);
 
-    // Fetch all tickets for the org (and agent if specified) created after
-    // startDate
-    // Note: For a real large-scale app, we would use explicit DB queries
-    // (COUNT/AVG)
-    // instead of fetching lists. For MVP, filtering in memory is acceptable.
     List<Ticket> allTickets = ticketRepository.findByOrganizationId(organizationId);
 
     // Filter by Date and Agent
@@ -37,7 +58,10 @@ public class AnalyticsService {
         .filter(t -> agentId == null || (t.getAgentId() != null && t.getAgentId().equals(agentId)))
         .toList();
 
-    // 1. Operational Metrics
+    return buildAnalyticsResponse(filtered);
+  }
+
+  private AnalyticsResponse buildAnalyticsResponse(List<Ticket> filtered) {
     long total = filtered.size();
     long resolved = filtered.stream()
         .filter(t -> t.getStatus() == TicketStatus.RESOLVED || t.getStatus() == TicketStatus.CLOSED).count();
@@ -82,6 +106,13 @@ public class AnalyticsService {
         sentimentDist,
         criticalCount,
         total > 0 ? (double) resolved / total * 100 : 0);
+  }
+
+  private AnalyticsResponse emptyAnalytics() {
+    return new AnalyticsResponse(
+        "0 min", "0 min", 0.0, 0L, 0.0, 0.0,
+        Map.of(), 0.0, 0.0,
+        Map.of(), Map.of(), Map.of(), 0L, 0.0);
   }
 
   private LocalDateTime calculateStartDate(TimePeriod range) {

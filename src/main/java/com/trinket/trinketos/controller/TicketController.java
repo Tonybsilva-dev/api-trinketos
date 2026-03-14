@@ -2,6 +2,7 @@ package com.trinket.trinketos.controller;
 
 import com.trinket.trinketos.dto.TicketRequest;
 import com.trinket.trinketos.dto.TicketResponse;
+import com.trinket.trinketos.model.Role;
 import com.trinket.trinketos.model.Ticket;
 import com.trinket.trinketos.model.TicketStatus;
 import com.trinket.trinketos.model.User;
@@ -19,6 +20,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/tickets")
@@ -29,6 +32,7 @@ public class TicketController {
 
   private final TicketRepository ticketRepository;
   private final UserRepository userRepository;
+  private final com.trinket.trinketos.repository.TeamRepository teamRepository;
   private final TicketAIService ticketAIService;
 
   @PostMapping
@@ -87,10 +91,33 @@ public class TicketController {
     User user = getUser(authentication);
 
     org.springframework.data.jpa.domain.Specification<Ticket> spec = (root, query, cb) -> {
-      java.util.List<jakarta.persistence.criteria.Predicate> predicates = new java.util.ArrayList<>();
+      List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
 
       // Mandatory: Organization
       predicates.add(cb.equal(root.get("organizationId"), user.getOrganizationId()));
+
+      // Agents can only see tickets assigned to their team OR in categories handled by their team
+      if (user.getRole() == Role.ROLE_AGENT) {
+        if (user.getTeamId() == null) {
+          // If agent has no team, they see no tickets
+          predicates.add(cb.disjunction());
+        } else {
+          // Fetch team categories
+          var team = teamRepository.findById(user.getTeamId()).orElse(null);
+          List<String> categoryNames = (team != null) 
+              ? team.getCategories().stream().map(com.trinket.trinketos.model.Category::getName).toList() 
+              : List.of();
+
+          jakarta.persistence.criteria.Predicate teamPredicate = cb.equal(root.get("teamId"), user.getTeamId());
+          
+          if (!categoryNames.isEmpty()) {
+            jakarta.persistence.criteria.Predicate categoryPredicate = root.get("category").in(categoryNames);
+            predicates.add(cb.or(teamPredicate, categoryPredicate));
+          } else {
+            predicates.add(teamPredicate);
+          }
+        }
+      }
 
       // Filters
       if (status != null) {
@@ -141,6 +168,23 @@ public class TicketController {
     if (!ticket.getOrganizationId().equals(currentUser.getOrganizationId())) {
       return ResponseEntity.status(403).build();
     }
+
+    // Agent check: must be in the same team OR handling the category
+    if (currentUser.getRole() == Role.ROLE_AGENT) {
+      if (currentUser.getTeamId() == null) {
+        return ResponseEntity.status(403).build();
+      }
+      
+      boolean sameTeam = currentUser.getTeamId().equals(ticket.getTeamId());
+      var team = teamRepository.findById(currentUser.getTeamId()).orElse(null);
+      boolean handlesCategory = (team != null) && team.getCategories().stream()
+          .anyMatch(c -> c.getName().equals(ticket.getCategory()));
+
+      if (!sameTeam && !handlesCategory) {
+        return ResponseEntity.status(403).build();
+      }
+    }
+
     return ResponseEntity.ok(mapToResponse(ticket));
   }
 
@@ -155,8 +199,23 @@ public class TicketController {
       return ResponseEntity.status(403).build();
     }
 
-    // Allow updating basic fields. For sophisticated workflow (status transitions)
-    // maybe separate endpoint, but standard CRUD implies PUT.
+    // Agent check: same team OR handles category
+    if (currentUser.getRole() == Role.ROLE_AGENT) {
+      if (currentUser.getTeamId() == null) {
+        return ResponseEntity.status(403).build();
+      }
+
+      boolean sameTeam = currentUser.getTeamId().equals(ticket.getTeamId());
+      var team = teamRepository.findById(currentUser.getTeamId()).orElse(null);
+      boolean handlesCategory = (team != null) && team.getCategories().stream()
+          .anyMatch(c -> c.getName().equals(ticket.getCategory()));
+
+      if (!sameTeam && !handlesCategory) {
+        return ResponseEntity.status(403).build();
+      }
+    }
+
+    // Allow updating basic fields.
     if (request.title() != null)
       ticket.setTitle(request.title());
     if (request.description() != null)
@@ -165,8 +224,6 @@ public class TicketController {
       ticket.setPriority(request.priority());
     if (request.status() != null)
       ticket.setStatus(request.status());
-
-    // TicketRequest now includes status.
 
     Ticket updated = ticketRepository.save(ticket);
     return ResponseEntity.ok(mapToResponse(updated));
@@ -191,8 +248,32 @@ public class TicketController {
   @Operation(summary = "Count tickets")
   public ResponseEntity<Long> countTickets(Authentication authentication) {
     User currentUser = getUser(authentication);
-    long count = ticketRepository
-        .count((root, query, cb) -> cb.equal(root.get("organizationId"), currentUser.getOrganizationId()));
+    long count = ticketRepository.count((root, query, cb) -> {
+      List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+      predicates.add(cb.equal(root.get("organizationId"), currentUser.getOrganizationId()));
+
+      if (currentUser.getRole() == Role.ROLE_AGENT) {
+        if (currentUser.getTeamId() == null) {
+          predicates.add(cb.disjunction());
+        } else {
+          var team = teamRepository.findById(currentUser.getTeamId()).orElse(null);
+          List<String> categoryNames = (team != null) 
+              ? team.getCategories().stream().map(com.trinket.trinketos.model.Category::getName).toList() 
+              : List.of();
+
+          jakarta.persistence.criteria.Predicate teamPredicate = cb.equal(root.get("teamId"), currentUser.getTeamId());
+          
+          if (!categoryNames.isEmpty()) {
+            jakarta.persistence.criteria.Predicate categoryPredicate = root.get("category").in(categoryNames);
+            predicates.add(cb.or(teamPredicate, categoryPredicate));
+          } else {
+            predicates.add(teamPredicate);
+          }
+        }
+      }
+
+      return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+    });
     return ResponseEntity.ok(count);
   }
 
@@ -202,9 +283,10 @@ public class TicketController {
         .orElseThrow(() -> new RuntimeException("User not found"));
 
     // Business Rule: Agents must have a Team.
-    if (user.getRole() == com.trinket.trinketos.model.Role.ROLE_AGENT && user.getTeamId() == null) {
-      throw new org.springframework.security.access.AccessDeniedException(
-          "Agentes não vinculados a um time não podem visualizar ou atuar em tickets.");
+    if (user.getRole() == Role.ROLE_AGENT && user.getTeamId() == null) {
+      // In this version, we don't throw for listing, we just return an empty list 
+      // via predicates. But for actions or specific views, we keep the check.
+      // throw new org.springframework.security.access.AccessDeniedException("Agentes sem time não podem...")
     }
 
     return user;
